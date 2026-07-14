@@ -1,0 +1,374 @@
+//Keypad initialization
+#include <Keypad.h>
+const byte ROWS = 4; 
+const byte COLS = 4; 
+
+char hexaKeys[ROWS][COLS] = {
+  {'1', '2', '3', 'A'},
+  {'4', '5', '6', 'B'},
+  {'7', '8', '9', 'C'},
+  {'*', '0', '#', 'D'}
+};
+// Connect keypad ROW0, ROW1, ROW2, and ROW3 to these Arduino pins
+byte rowPins[ROWS] = {47, 45, 43, 41}; 
+// Connect keypad COL0, COL1, COL2, and COL3 to these Arduino pins
+byte colPins[COLS] = {33, 35, 37, 39}; 
+Keypad customKeypad = Keypad(makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS);
+
+
+//7 segment init
+const bool digitPatterns[10][8] = { //Patterns for each digit in a 7 segment display
+  { 0, 0, 0, 0, 0, 0, 1, 1 }, // 0
+  { 1, 0, 0, 1, 1, 1, 1, 1 }, // 1
+  { 0, 0, 1, 0, 0, 1, 0, 1 }, // 2
+  { 0, 0, 0, 0, 1, 1, 0, 1 }, // 3
+  { 1, 0, 0, 1, 1, 0, 0, 1 }, // 4
+  { 0, 1, 0, 0, 1, 0, 0, 1 }, // 5
+  { 0, 1, 0, 0, 0, 0, 0, 1 }, // 6
+  { 0, 0, 0, 1, 1, 1, 1, 1 }, // 7
+  { 0, 0, 0, 0, 0, 0, 0, 1 }, // 8
+  { 0, 0, 0, 0, 1, 0, 0, 1 }  // 9
+};
+int M_timerPins[8] = {11,10,7,8,9,12,13,6}; //pins for the two digits of the timer and the tuning games display
+int L_timerPins[8] = {3,2,16,15,14,4,5,17};
+
+
+//simon says init
+#define SIMON_R 20//red green blue and yellow buttons for the simon says game
+#define SIMON_G 22
+#define SIMON_B 21
+#define SIMON_Y 23
+
+
+//cut the wire init
+#define BROWN_WIRE 31
+#define RED_WIRE 29
+#define GREEN_WIRE 27
+
+//seed and red button init
+#define END_BUTTON 19
+#define RED_LED 51
+#define GREEN_LED 49
+#define BLUE_LED 53
+
+int seed = 3;
+int timeLeft = 99;
+int gameTick = 0;
+
+int simonProgress = 0;
+int quizProgress = 0;
+
+bool cutComplete = 0;
+bool simonComplete = 0;
+bool quizComplete = 0;
+
+
+void print71(int pins[8], int output) {   //Prints to a 1 digit 7 segment display
+  if (output < 0 || output > 9) return; 
+  for (int i = 0; i < 8; i++) {
+    digitalWrite(pins[i], digitPatterns[output][i]);
+  }
+}
+void print72(int MSPs[8], int LSPs[8], int output) {  //Prints to a 2 digit 7 segment display
+  if (output < 0 || output > 99) return; 
+  print71(MSPs, output/10); //prints the most significant digit
+  print71(LSPs, output%10); //prints the least significant digit
+}
+
+bool simonSays() {
+  if (simonComplete) return true; 
+
+  switch (seed) { 
+      case 1: // Sequence: R G Y R B B B
+        if (simonProgress == 0 && digitalRead(SIMON_R)) {
+          while(digitalRead(SIMON_R)); // Wait for button release
+          Serial.println("Seed 1: Stage 0 correct");
+          simonProgress = 1;
+        }
+        else if (simonProgress == 1 && digitalRead(SIMON_G)) {
+          while(digitalRead(SIMON_G));
+          Serial.println("Seed 1: Stage 1 correct");
+          simonProgress = 2;
+        }
+        else if (simonProgress == 2 && digitalRead(SIMON_Y)) {
+          while(digitalRead(SIMON_Y));
+          Serial.println("Seed 1: Stage 2 correct");
+          simonProgress = 3;
+        }
+        else if (simonProgress == 3 && digitalRead(SIMON_R)) {
+          while(digitalRead(SIMON_R));
+          Serial.println("Seed 1: Stage 3 correct");
+          simonProgress = 4;
+        }
+        else if (simonProgress == 4 && digitalRead(SIMON_B)) {
+          while(digitalRead(SIMON_B));
+          Serial.println("Seed 1: Stage 4 correct");
+          simonProgress = 5;
+        }
+        else if (simonProgress == 5 && digitalRead(SIMON_B)) {
+          while(digitalRead(SIMON_B));
+          Serial.println("Seed 1: Stage 5 correct");
+          simonProgress = 6;
+        }
+        else if (simonProgress == 6 && digitalRead(SIMON_B)) {
+          while(digitalRead(SIMON_B));
+          Serial.println("Seed 1: Simon Module Defused!");
+          simonComplete = true;
+        }
+        else if (digitalRead(SIMON_R) || digitalRead(SIMON_G) || digitalRead(SIMON_B) || digitalRead(SIMON_Y)) lose();
+        break;
+
+      case 2: // Sequence: R G B Y R G Y
+        if (simonProgress == 0 && digitalRead(SIMON_R)) {
+          while(digitalRead(SIMON_R));
+          Serial.println("Seed 2: Stage 0 correct");
+          simonProgress = 1;
+        }
+        else if (simonProgress == 1 && digitalRead(SIMON_G)) {
+          while(digitalRead(SIMON_G));
+          Serial.println("Seed 2: Stage 1 correct");
+          simonProgress = 2;
+        }
+        else if (simonProgress == 2 && digitalRead(SIMON_B)) {
+          while(digitalRead(SIMON_B));
+          Serial.println("Seed 2: Stage 2 correct");
+          simonProgress = 3;
+        }
+        else if (simonProgress == 3 && digitalRead(SIMON_Y)) {
+          while(digitalRead(SIMON_Y));
+          Serial.println("Seed 2: Stage 3 correct");
+          simonProgress = 4;
+        }
+        else if (simonProgress == 4 && digitalRead(SIMON_R)) {
+          while(digitalRead(SIMON_R));
+          Serial.println("Seed 2: Stage 4 correct");
+          simonProgress = 5;
+        }
+        else if (simonProgress == 5 && digitalRead(SIMON_G)) {
+          while(digitalRead(SIMON_G));
+          Serial.println("Seed 2: Stage 5 correct");
+          simonProgress = 6;
+        }
+        else if (simonProgress == 6 && digitalRead(SIMON_Y)) {
+          while(digitalRead(SIMON_Y));
+          Serial.println("Seed 2: Simon Module Defused!");
+          simonComplete = true;
+        }
+        else if (digitalRead(SIMON_R) || digitalRead(SIMON_G) || digitalRead(SIMON_B) || digitalRead(SIMON_Y)) lose();
+        break;
+
+      default: // Seed 3 Sequence: B B B B G R R
+        if (simonProgress == 0 && digitalRead(SIMON_B)) {
+          while(digitalRead(SIMON_B));
+          Serial.println("Seed 3: Stage 0 correct");
+          simonProgress = 1;
+        }
+        else if (simonProgress == 1 && digitalRead(SIMON_B)) {
+          while(digitalRead(SIMON_B));
+          Serial.println("Seed 3: Stage 1 correct");
+          simonProgress = 2;
+        }
+        else if (simonProgress == 2 && digitalRead(SIMON_B)) {
+          while(digitalRead(SIMON_B));
+          Serial.println("Seed 3: Stage 2 correct");
+          simonProgress = 3;
+        }
+        else if (simonProgress == 3 && digitalRead(SIMON_B)) {
+          while(digitalRead(SIMON_B));
+          Serial.println("Seed 3: Stage 3 correct");
+          simonProgress = 4;
+        }
+        else if (simonProgress == 4 && digitalRead(SIMON_G)) {
+          while(digitalRead(SIMON_G));
+          Serial.println("Seed 3: Stage 4 correct");
+          simonProgress = 5;
+        }
+        else if (simonProgress == 5 && digitalRead(SIMON_R)) {
+          while(digitalRead(SIMON_R));
+          Serial.println("Seed 3: Stage 5 correct");
+          simonProgress = 6;
+        }
+        else if (simonProgress == 6 && digitalRead(SIMON_R)) {
+          while(digitalRead(SIMON_R));
+          Serial.println("Seed 3: Simon Module Defused!");
+          simonComplete = true;
+        }
+        else if (digitalRead(SIMON_R) || digitalRead(SIMON_G) || digitalRead(SIMON_B) || digitalRead(SIMON_Y)) lose();
+        break;
+  }
+  
+  return simonComplete;
+}
+
+bool cutTheWire() {
+  if (cutComplete) return true;
+  switch (seed) { //display what seed were on
+      case 1:
+        if(digitalRead(RED_WIRE) && digitalRead(GREEN_WIRE)) {
+          cutComplete = 1;
+          Serial.println("Wires Defused");
+          return true;
+        }
+        else if (digitalRead (BROWN_WIRE)) lose();
+        break;
+      case 2:
+        if(digitalRead(BROWN_WIRE) && digitalRead(GREEN_WIRE)) {
+          cutComplete = 1;
+          Serial.println("Wires Defused");
+          return true;
+        }
+        else if (digitalRead (RED_WIRE)) lose();
+        break;
+      default:
+        if(digitalRead(RED_WIRE) && digitalRead(BROWN_WIRE)) {
+          cutComplete = 1;
+          Serial.println("Wires Defused");
+          return true;
+        }
+        else if (digitalRead (GREEN_WIRE)) lose();
+        break;
+    }
+  return false;
+}
+
+bool keyQuiz(char key) {
+  if (quizComplete) return true;
+  switch (seed) {
+    case 1: // Target Sequence: 2 -> 0 -> 1 -> 8 -> [A, B, C, or D]
+      if      (quizProgress == 0 && key == '2') quizProgress = 1;
+      else if (quizProgress == 1 && key == '0') quizProgress = 2;
+      else if (quizProgress == 2 && key == '1') quizProgress = 3;
+      else if (quizProgress == 3 && key == '8') quizProgress = 4;
+      else if (quizProgress == 4 && (key >= 'A' && key <= 'D')) {
+        Serial.println("Seed 1 Quiz Defused!");
+        quizComplete = true;
+      }
+      else {
+        lose(); 
+      }
+      break;
+
+    case 2: // Target Sequence: 1 -> 3 -> 0 -> [A, B, C, or D]
+      if      (quizProgress == 0 && key == '1') quizProgress = 1;
+      else if (quizProgress == 1 && key == '3') quizProgress = 2;
+      else if (quizProgress == 2 && key == '0') quizProgress = 3;
+      else if (quizProgress == 3 && (key >= 'A' && key <= 'D')) {
+        Serial.println("Seed 2 Quiz Defused!");
+        quizComplete = true;
+      }
+      else {
+        lose(); 
+      }
+      break;
+
+    default: // Seed 3 Target Sequence: 1 -> 1 -> 8 -> [A, B, C, or D]
+      if      (quizProgress == 0 && key == '1') quizProgress = 1;
+      else if (quizProgress == 1 && key == '1') quizProgress = 2;
+      else if (quizProgress == 2 && key == '8') quizProgress = 3;
+      else if (quizProgress == 3 && (key >= 'A' && key <= 'D')) {
+        Serial.println("Seed 3 Quiz Defused!");
+        quizComplete = true;
+      }
+      else {
+        lose(); 
+      }
+      break;
+  }
+}
+
+void checkCompletion() {
+  if (cutComplete && simonComplete && quizComplete) win();
+  else lose();
+}
+
+void win() {
+  Serial.println("Wow you win!!!!!!");
+  delay(100);
+  exit(0);
+}
+
+void lose() {
+  print72(M_timerPins, L_timerPins, 0);
+  exit(0);
+}
+
+void initialize() {
+  //pinmode and turning off the 7 segment pins
+  for (int i = 2; i < 18; i++) {
+    pinMode(i, OUTPUT);
+    digitalWrite(i, HIGH);
+  }
+
+  //pinmode for the seed led
+  pinMode(RED_LED, OUTPUT);
+  pinMode(GREEN_LED, OUTPUT);
+  pinMode(BLUE_LED, OUTPUT);
+  digitalWrite(RED_LED, HIGH);
+  digitalWrite(GREEN_LED, HIGH);
+  digitalWrite(BLUE_LED, HIGH);
+
+  //pinmode for simon says
+  pinMode(SIMON_R, INPUT);
+  pinMode(SIMON_G, INPUT);
+  pinMode(SIMON_B, INPUT);
+  pinMode(SIMON_Y, INPUT);
+
+  //pinmode for big button
+  pinMode(END_BUTTON, INPUT);
+
+  //pinmode for cut the wire
+  pinMode(BROWN_WIRE, INPUT_PULLUP);
+  pinMode(RED_WIRE, INPUT_PULLUP);
+  pinMode(GREEN_WIRE, INPUT_PULLUP);
+
+  Serial.begin(9600);
+
+  randomSeed(analogRead(0)); //seed our RNG function
+  seed = random(1, 4);
+  timeLeft = 99;
+  gameTick = 0;
+
+  simonProgress = 0;
+  quizProgress = 0;
+
+  cutComplete = 0;
+  simonComplete = 0;
+  quizComplete = 0;
+}
+
+void setup() {
+  initialize();
+  Serial.print("Current seed: ");
+  Serial.println(seed);
+  switch (seed) { //display what seed were on
+      case 1:
+        digitalWrite(RED_LED, LOW);
+        break;
+      case 2:
+        digitalWrite(GREEN_LED, LOW);
+        break;
+      default:
+        digitalWrite(BLUE_LED, LOW);
+        break;
+    }
+}
+
+void loop() {
+  //increment the game tick and update the timer
+  delay(20);
+  gameTick++;
+  if(((gameTick % 90) == 0) && (timeLeft > 10)) timeLeft--;
+  else if (((gameTick % 200) == 0) && (timeLeft <= 10)) timeLeft--;
+  print72(M_timerPins, L_timerPins, timeLeft);
+  
+  if(digitalRead(END_BUTTON)) checkCompletion();
+
+  simonSays();
+  cutTheWire();
+  char key = customKeypad.getKey();
+  if (key) {
+    Serial.print("Key Pressed: ");
+    Serial.println(key);
+    keyQuiz(key);
+  }
+}
