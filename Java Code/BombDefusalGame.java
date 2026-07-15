@@ -22,6 +22,7 @@ public class BombDefusalGame extends AbstractGame {
     private CutTheWire cutTheWire;
     private GameTimer timer;
 
+    //   Volatile keyword ensures any thread-driven changes to the game result (e.g., from the timer thread) are immediately visible to the main execution loop thread.
     private volatile GameResult result;
     private int seed;
 
@@ -31,6 +32,7 @@ public class BombDefusalGame extends AbstractGame {
     }
 
     @Override
+    //   Overrides Template Method step. Initializes physical connection ports and uses a randomized seed (1-3) to coordinate puzzles on both platforms.
     protected void initializeGame() throws SerialPortException {
         System.out.println("Opening coordinator XBee on " + xbeePort + "...");
 
@@ -49,6 +51,7 @@ public class BombDefusalGame extends AbstractGame {
     }
 
     @Override
+    //   Overrides Template Method step. Starts background game timers and transmits startup directives ("SEED" and "GAME:START") over XBee to prime the Arduino.
     protected void startGameServices() throws SerialPortException {
         timer = new GameTimer(
                 STARTING_TIME_SECONDS,
@@ -66,6 +69,7 @@ public class BombDefusalGame extends AbstractGame {
     }
 
     @Override
+    //   Overrides Template Method step. Continuous poll loop driving active runtime play. Reads inbound Xbee string events until state changes from RUNNING.
     protected void playGame() throws SerialPortException {
         while (result == GameResult.RUNNING) {
             String signal = connection.readLine();
@@ -76,6 +80,7 @@ public class BombDefusalGame extends AbstractGame {
         }
     }
 
+    //   Parses inbound colon-delimited string messages from Arduino (e.g., "SIMON:R" or "KEY:4") and delegates them to their validation handlers.
     private void processSignal(String signal) {
         System.out.println("Arduino -> Java: " + signal);
 
@@ -109,6 +114,7 @@ public class BombDefusalGame extends AbstractGame {
         }
     }
 
+    //   Validates Simon Says button press sequences sequentially. Triggers loss conditions instantly if an out-of-order button is pressed.
     private void handleSimon(String value) {
         if (value.length() != 1) {
             lose("Invalid Simon signal.");
@@ -139,6 +145,7 @@ public class BombDefusalGame extends AbstractGame {
         }
     }
 
+    //   Validates sequential keypad password inputs. If the wrong key is keyed, the bomb immediately triggers a loss sequence.
     private void handleKeypad(String value) {
         if (value.length() != 1) {
             lose("Invalid keypad signal.");
@@ -162,6 +169,7 @@ public class BombDefusalGame extends AbstractGame {
         }
     }
 
+    //   Validates the sequence of cut wires (analog pins going HIGH on Arduino side). Mismatched wire cuts result in explosion/loss.
     private void handleWire(String value) {
         if (!cutTheWire.cut(value)) {
             lose("Wrong wire cut: " + value);
@@ -178,6 +186,7 @@ public class BombDefusalGame extends AbstractGame {
         }
     }
 
+    //   Evaluates victory condition. The user must complete Simon, Keypad, and Wire puzzles completely BEFORE triggering the main end button.
     private void handleEndButton(String value) {
         if (!value.equals("PRESSED")) {
             return;
@@ -195,6 +204,7 @@ public class BombDefusalGame extends AbstractGame {
         }
     }
 
+    //   Synchronized state transition to declare game victory, modifying status flags and stopping active timers cleanly.
     private synchronized void win() {
         if (result != GameResult.RUNNING) {
             return;
@@ -207,6 +217,7 @@ public class BombDefusalGame extends AbstractGame {
         }
     }
 
+    //   Synchronized state transition to declare game failure, stopping active timers and documenting the failure reason.
     private synchronized void lose(String reason) {
         if (result != GameResult.RUNNING) {
             return;
@@ -228,6 +239,7 @@ public class BombDefusalGame extends AbstractGame {
         sendCommandSafely("TIME:" + secondsRemaining);
     }
 
+    //   Transmits status commands to the Arduino via XBee. Handles port disconnections gracefully without crashing the app.
     private void sendCommandSafely(String command) {
         try {
             if (connection != null && connection.isOpen()) {
@@ -239,6 +251,7 @@ public class BombDefusalGame extends AbstractGame {
     }
 
     @Override
+    //   Overrides Template Method step. Resolves final state and communicates success/failure packets directly to the physical system.
     protected void finishGame() throws SerialPortException {
         if (result == GameResult.WON) {
             System.out.println("BOMB DEFUSED — PLAYER WON!");
@@ -250,6 +263,7 @@ public class BombDefusalGame extends AbstractGame {
     }
 
     @Override
+    //   Overrides Template Method step. Safely catches background runtime exceptions and alerts the Arduino to clean up.
     protected void handleUnexpectedError(Exception exception) {
         System.err.println(
                 "Unexpected game error: " + exception.getMessage()
@@ -260,6 +274,7 @@ public class BombDefusalGame extends AbstractGame {
     }
 
     @Override
+    //   Overrides Template Method step. Executed via final block to safely stop running timers and release serial hardware ports.
     protected void cleanUp() {
         if (timer != null) {
             timer.stop();
